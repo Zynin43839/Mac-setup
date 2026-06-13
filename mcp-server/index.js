@@ -7,6 +7,9 @@ import { createInterface } from 'readline';
 
 // ── Config ──
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
+const JIRA_URL = process.env.JIRA_URL || '';
+const JIRA_EMAIL = process.env.JIRA_EMAIL || '';
+const JIRA_TOKEN = process.env.JIRA_TOKEN || '';
 const MCP_SERVER_INFO = {
   name: 'cat-meeting-mcp',
   version: '1.0.0',
@@ -253,6 +256,46 @@ const TOOLS = [
       required: ['id'],
     },
   },
+  // ── Jira ──
+  {
+    name: 'jira_list_projects',
+    description: 'List all Jira projects. Requires JIRA_URL, JIRA_EMAIL, JIRA_TOKEN env vars.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'jira_search_issues',
+    description: 'Search Jira issues using JQL query. Requires JIRA_URL, JIRA_EMAIL, JIRA_TOKEN env vars.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jql: { type: 'string', description: 'JQL query (e.g. "project = PROJ AND status != Done")' },
+        maxResults: { type: 'number', description: 'Max results (default 20)', default: 20 },
+      },
+      required: ['jql'],
+    },
+  },
+  {
+    name: 'jira_get_issue',
+    description: 'Get full details of a single Jira issue by key. Requires JIRA_URL, JIRA_EMAIL, JIRA_TOKEN env vars.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: { type: 'string', description: 'Issue key (e.g. PROJ-123)' },
+      },
+      required: ['issueKey'],
+    },
+  },
+  {
+    name: 'jira_get_sprint',
+    description: 'Get active sprint issues for a board. Requires JIRA_URL, JIRA_EMAIL, JIRA_TOKEN env vars.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        boardId: { type: 'number', description: 'Jira board ID' },
+      },
+      required: ['boardId'],
+    },
+  },
 ];
 
 // ── Resource Definitions ──
@@ -288,9 +331,15 @@ const RESOURCES = [
     mimeType: 'application/json',
   },
   {
-    uriPattern: 'meetings://{id}',
-    name: 'Single Meeting',
-    description: 'Full detail of a specific meeting by ID',
+    uri: 'briefings://list',
+    name: 'All Briefings',
+    description: 'List of all briefing items',
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'jira://projects',
+    name: 'Jira Projects',
+    description: 'List of Jira projects (requires Jira env vars)',
     mimeType: 'application/json',
   },
 ];
@@ -348,6 +397,29 @@ async function apiDelete(path) {
   const url = `${BACKEND_URL}${path}`;
   const res = await fetch(url, { method: 'DELETE' });
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  return res.json();
+}
+
+// ── Jira API ──
+
+function jiraAuthHeaders() {
+  if (!JIRA_URL || !JIRA_EMAIL || !JIRA_TOKEN) {
+    throw new Error('Jira not configured. Set JIRA_URL, JIRA_EMAIL, JIRA_TOKEN env vars.');
+  }
+  const encoded = Buffer.from(`${JIRA_EMAIL}:${JIRA_TOKEN}`).toString('base64');
+  return {
+    Authorization: `Basic ${encoded}`,
+    Accept: 'application/json',
+  };
+}
+
+async function jiraGet(path) {
+  const url = `${JIRA_URL.replace(/\/+$/, '')}${path}`;
+  const res = await fetch(url, { headers: jiraAuthHeaders() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Jira ${res.status}: ${text || res.statusText}`);
+  }
   return res.json();
 }
 
@@ -561,6 +633,79 @@ async function handleToolsCall(name, args) {
       return { content: [{ type: 'text', text: `Briefing ${args.id} deleted` }] };
     }
 
+    // ── Jira ──
+    case 'jira_list_projects': {
+      const projects = await jiraGet('/rest/api/3/project');
+      const result = projects.map(p => ({
+        key: p.key,
+        name: p.name,
+        lead: p.lead?.displayName || '',
+        category: p.projectCategory?.name || '',
+      }));
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    }
+
+    case 'jira_search_issues': {
+      if (!args?.jql) throw new Error('JQL query required');
+      const max = args.maxResults || 20;
+      const data = await jiraGet(`/rest/api/3/search?jql=${encodeURIComponent(args.jql)}&maxResults=${max}`);
+      const result = data.issues.map(issue => ({
+        key: issue.key,
+        summary: issue.fields.summary,
+        status: issue.fields.status?.name || '',
+        assignee: issue.fields.assignee?.displayName || '',
+        priority: issue.fields.priority?.name || '',
+        created: issue.fields.created,
+        updated: issue.fields.updated,
+      }));
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ total: data.total, issues: result }, null, 2) }],
+      };
+    }
+
+    case 'jira_get_issue': {
+      if (!args?.issueKey) throw new Error('Issue key required');
+      const issue = await jiraGet(`/rest/api/3/issue/${args.issueKey}`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify({
+          key: issue.key,
+          summary: issue.fields.summary,
+          description: issue.fields.description,
+          status: issue.fields.status?.name || '',
+          assignee: issue.fields.assignee?.displayName || '',
+          reporter: issue.fields.reporter?.displayName || '',
+          priority: issue.fields.priority?.name || '',
+          labels: issue.fields.labels || [],
+          created: issue.fields.created,
+          updated: issue.fields.updated,
+          duedate: issue.fields.duedate || '',
+          fixVersions: (issue.fields.fixVersions || []).map(v => v.name),
+          components: (issue.fields.components || []).map(c => c.name),
+          subtasks: (issue.fields.subtasks || []).map(s => s.key),
+        }, null, 2) }],
+      };
+    }
+
+    case 'jira_get_sprint': {
+      if (!args?.boardId) throw new Error('Board ID required');
+      const sprints = await jiraGet(`/rest/agile/1.0/board/${args.boardId}/sprint?state=active`);
+      const sprint = sprints.values?.[0];
+      if (!sprint) return { content: [{ type: 'text', text: 'No active sprint found' }] };
+      const issues = await jiraGet(`/rest/agile/1.0/sprint/${sprint.id}/issue`);
+      const result = {
+        sprint: { name: sprint.name, goal: sprint.goal || '', startDate: sprint.startDate, endDate: sprint.endDate },
+        total: issues.total,
+        issues: issues.issues.map(issue => ({
+          key: issue.key,
+          summary: issue.fields.summary,
+          status: issue.fields.status?.name || '',
+          assignee: issue.fields.assignee?.displayName || '',
+          priority: issue.fields.priority?.name || '',
+        })),
+      };
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -609,6 +754,19 @@ async function handleResourcesRead(uri) {
     return {
       contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(briefings, null, 2) }],
     };
+  }
+
+  if (uri === 'jira://projects') {
+    try {
+      const projects = await jiraGet('/rest/api/3/project');
+      return {
+        contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(projects, null, 2) }],
+      };
+    } catch (e) {
+      return {
+        contents: [{ uri, mimeType: 'text/plain', text: `Jira not configured: ${e.message}. Set JIRA_URL, JIRA_EMAIL, JIRA_TOKEN env vars.` }],
+      };
+    }
   }
 
   const idMatch = uri.match(/^meetings:\/\/(.+)$/);
@@ -801,3 +959,8 @@ rl.on('close', () => {
 process.stderr.write('[mcp-server] Cat Meeting MCP Server started\n');
 process.stderr.write(`[mcp-server] Backend: ${BACKEND_URL}\n`);
 process.stderr.write(`[mcp-server] Tools: ${TOOLS.map(t => t.name).join(', ')}\n`);
+if (JIRA_URL && JIRA_EMAIL && JIRA_TOKEN) {
+  process.stderr.write(`[mcp-server] Jira: ${JIRA_URL} (authenticated)\n`);
+} else {
+  process.stderr.write('[mcp-server] Jira: not configured (set JIRA_URL, JIRA_EMAIL, JIRA_TOKEN)\n');
+}

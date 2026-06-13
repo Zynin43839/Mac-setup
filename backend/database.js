@@ -46,7 +46,6 @@ function initSchema() {
     );
 
     INSERT OR IGNORE INTO settings (id, data) VALUES (1, '{}');
-  `);
 
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
