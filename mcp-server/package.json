@@ -1,0 +1,11 @@
+{
+  "name": "cat-meeting-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP Server for Cat Meeting — expose meeting agent as AI-accessible tools",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  }
+}

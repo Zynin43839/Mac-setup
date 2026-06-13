@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+:root {
+  --neo-border: #3d3d5c;
+  --neo-shadow: rgba(0, 0, 0, 0.35);
+  --neo-bg-card: #25253e;
+  --neo-bg-page: #1a1a2e;
+  --neo-pink: #f472b6;
+  --neo-violet: #a78bfa;
+  --neo-yellow: #facc15;
+  --neo-emerald: #34d399;
+  --neo-cyan: #22d3ee;
+  --neo-rose: #fb7185;
+  --neo-orange: #fb923c;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--neo-bg-page);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3d3d5c;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5a5a7a;
+}
+
+::selection {
+  background: rgba(244, 114, 182, 0.35);
+  color: white;
+}
+
+select option {
+  background: #1e1e36;
+  color: white;
+}
+
+@keyframes recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.neo-card {
+  background: var(--neo-bg-card);
+  border: 2px solid var(--neo-border);
+  box-shadow: 4px 4px 0 0 var(--neo-shadow);
+  border-radius: 12px;
+}
+
+.neo-card-sm {
+  background: var(--neo-bg-card);
+  border: 2px solid var(--neo-border);
+  box-shadow: 3px 3px 0 0 var(--neo-shadow);
+  border-radius: 10px;
+}
+
+.neo-btn {
+  border: 2px solid var(--neo-border);
+  box-shadow: 3px 3px 0 0 var(--neo-shadow);
+  border-radius: 10px;
+  font-weight: 700;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.neo-btn:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 0 var(--neo-shadow);
+}
+
+.neo-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 0 var(--neo-shadow);
+}
+
+.neo-btn:disabled {
+  opacity: 0.5;
+  transform: none;
+  box-shadow: 3px 3px 0 0 var(--neo-shadow);
+  cursor: not-allowed;
+}
+
+.neo-input {
+  background: #1e1e36;
+  border: 2px solid var(--neo-border);
+  border-radius: 10px;
+  color: white;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.neo-input:focus {
+  border-color: var(--neo-pink);
+  box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.15);
+}
+
+.neo-badge {
+  border: 2px solid var(--neo-border);
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+}
+
+.neo-section-title {
+  font-weight: 800;
+  color: white;
+  letter-spacing: -0.02em;
+}
+
+.neo-glow-pink {
+  box-shadow: 0 0 20px rgba(244, 114, 182, 0.15);
+}
+
+.neo-glow-violet {
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.15);
+}
