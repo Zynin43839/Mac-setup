@@ -22,23 +22,23 @@ describe('Integration Tests', () => {
       render(<App />);
       
       expect(screen.getAllByText(/Upload Audio/i).length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText(/Meeting History/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/Meetings/i).length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText(/AI Assistant/i).length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText(/STT Settings/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/Settings/i).length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should show Home page by default', () => {
+    it('should show Dashboard by default', () => {
       mockMeetingsApi([]);
       render(<App />);
       
-      expect(screen.getByText(/ยินดีต้อนรับ/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Working Station/i).length).toBeGreaterThanOrEqual(1);
     });
 
     it('should navigate to Meeting History', async () => {
       mockMeetingsApi([]);
       const { user } = render(<App />);
       
-      const historyTab = getSidebarTab(/Meeting History/i);
+      const historyTab = getSidebarTab(/Meetings/i);
       await user.click(historyTab);
       
       await waitFor(() => {
@@ -62,7 +62,7 @@ describe('Integration Tests', () => {
       mockMeetingsApi([]);
       const { user } = render(<App />);
       
-      const settingsTab = getSidebarTab(/STT Settings/i);
+      const settingsTab = getSidebarTab(/Settings/i);
       await user.click(settingsTab);
       
       await waitFor(() => {
@@ -79,7 +79,7 @@ describe('Integration Tests', () => {
       const { user } = render(<App />);
       
       // Navigate to history
-      const historyTab = getSidebarTab(/Meeting History/i);
+      const historyTab = getSidebarTab(/Meetings/i);
       await user.click(historyTab);
       
       await waitFor(() => {
@@ -117,7 +117,7 @@ describe('Integration Tests', () => {
       const { user } = render(<App />);
       
       // Go to settings
-      const settingsTab = getSidebarTab(/STT Settings/i);
+      const settingsTab = getSidebarTab(/Settings/i);
       await user.click(settingsTab);
       
       await waitFor(() => {
@@ -181,15 +181,14 @@ describe('Integration Tests', () => {
       });
       
       // Navigate to history
-      const historyTab = getSidebarTab(/Meeting History/i);
+      const historyTab = getSidebarTab(/Meetings/i);
       await user.click(historyTab);
-      
-      // Delete a meeting
+
       await waitFor(() => {
         expect(screen.getByText('Meeting 1')).toBeInTheDocument();
       });
       
-      const trashButtons = screen.getAllByTitle('Delete meeting');
+      const trashButtons = await screen.findAllByTitle('Delete meeting');
       await user.click(trashButtons[0]);
       
       // Badge should update to 1

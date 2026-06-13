@@ -296,6 +296,73 @@ export async function downloadModelFile(name: string): Promise<any> {
   return data;
 }
 
+// ── Projects API ──
+
+export async function loadProjects() {
+  const data = await apiCall('/projects');
+  if (data === null) throw new Error('Failed to load projects');
+  return data;
+}
+
+export async function createProjectAPI(project) {
+  const result = await apiCall('/projects', { method: 'POST', body: JSON.stringify(project) });
+  if (!result) throw new Error('Failed to create project');
+  return loadProjects();
+}
+
+export async function updateProjectAPI(id, updates) {
+  await apiCall(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
+  return loadProjects();
+}
+
+export async function deleteProjectAPI(id) {
+  await apiCall(`/projects/${id}`, { method: 'DELETE' });
+  return loadProjects();
+}
+
+// ── Roadmap API ──
+
+export async function loadRoadmapItems() {
+  const data = await apiCall('/roadmap');
+  if (data === null) throw new Error('Failed to load roadmap');
+  return data;
+}
+
+export async function createRoadmapItemAPI(item) {
+  const result = await apiCall('/roadmap', { method: 'POST', body: JSON.stringify(item) });
+  if (!result) throw new Error('Failed to create roadmap item');
+  return loadRoadmapItems();
+}
+
+export async function updateRoadmapItemAPI(id, updates) {
+  await apiCall(`/roadmap/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
+  return loadRoadmapItems();
+}
+
+export async function deleteRoadmapItemAPI(id) {
+  await apiCall(`/roadmap/${id}`, { method: 'DELETE' });
+  return loadRoadmapItems();
+}
+
+// ── Briefing API ──
+
+export async function loadBriefings() {
+  const data = await apiCall('/briefings');
+  if (data === null) throw new Error('Failed to load briefings');
+  return data;
+}
+
+export async function createBriefingAPI(briefing) {
+  const result = await apiCall('/briefings', { method: 'POST', body: JSON.stringify(briefing) });
+  if (!result) throw new Error('Failed to create briefing');
+  return loadBriefings();
+}
+
+export async function deleteBriefingAPI(id) {
+  await apiCall(`/briefings/${id}`, { method: 'DELETE' });
+  return loadBriefings();
+}
+
 export function getAudioDuration(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
     const audio = new Audio();

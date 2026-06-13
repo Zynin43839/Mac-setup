@@ -95,6 +95,164 @@ const TOOLS = [
     description: 'List all available departments.',
     inputSchema: { type: 'object', properties: {} },
   },
+  // ── Projects ──
+  {
+    name: 'list_projects',
+    description: 'List projects with optional status/department filters.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['planning', 'active', 'paused', 'completed', 'cancelled'], description: 'Filter by status' },
+        department: { type: 'string', description: 'Filter by department' },
+      },
+    },
+  },
+  {
+    name: 'get_project',
+    description: 'Get full project details by ID.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'Project ID' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'create_project',
+    description: 'Create a new project.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Project name' },
+        description: { type: 'string', description: 'Description' },
+        department: { type: 'string', description: 'Department' },
+        status: { type: 'string', enum: ['planning', 'active', 'paused', 'completed', 'cancelled'] },
+        priority: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
+        progress: { type: 'number', description: 'Progress 0-100' },
+        lead: { type: 'string', description: 'Project lead' },
+        startDate: { type: 'string', description: 'Start date' },
+        targetDate: { type: 'string', description: 'Target date' },
+        tags: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['name', 'department'],
+    },
+  },
+  {
+    name: 'update_project',
+    description: 'Update project status, progress, or fields.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Project ID' },
+        status: { type: 'string', enum: ['planning', 'active', 'paused', 'completed', 'cancelled'] },
+        progress: { type: 'number', description: 'Progress 0-100' },
+        name: { type: 'string' },
+        priority: { type: 'string' },
+        lead: { type: 'string' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'delete_project',
+    description: 'Delete a project by ID.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'Project ID' } },
+      required: ['id'],
+    },
+  },
+  // ── Roadmap ──
+  {
+    name: 'list_roadmap',
+    description: 'List roadmap items with optional filters.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        department: { type: 'string' },
+        quarter: { type: 'string' },
+        year: { type: 'number' },
+        status: { type: 'string', enum: ['planned', 'in-progress', 'completed', 'cancelled'] },
+      },
+    },
+  },
+  {
+    name: 'add_roadmap_item',
+    description: 'Add a new roadmap item.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        module: { type: 'string' },
+        quarter: { type: 'string' },
+        year: { type: 'number' },
+        department: { type: 'string' },
+        priority: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
+      },
+      required: ['title', 'quarter'],
+    },
+  },
+  {
+    name: 'update_roadmap_item',
+    description: 'Update a roadmap item status or details.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        status: { type: 'string', enum: ['planned', 'in-progress', 'completed', 'cancelled'] },
+        title: { type: 'string' },
+        priority: { type: 'string' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'delete_roadmap_item',
+    description: 'Delete a roadmap item.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+  },
+  // ── Briefing ──
+  {
+    name: 'list_briefings',
+    description: 'List briefing items with optional category filter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', enum: ['news', 'competitor', 'tech', 'all'] },
+        limit: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: 'add_briefing',
+    description: 'Add a briefing item.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        summary: { type: 'string' },
+        category: { type: 'string', enum: ['news', 'competitor', 'tech'] },
+        source: { type: 'string' },
+        url: { type: 'string' },
+        date: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['title', 'category'],
+    },
+  },
+  {
+    name: 'delete_briefing',
+    description: 'Delete a briefing item.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+  },
 ];
 
 // ── Resource Definitions ──
@@ -103,6 +261,24 @@ const RESOURCES = [
     uri: 'meetings://list',
     name: 'All Meetings',
     description: 'List of all meetings in the database',
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'projects://list',
+    name: 'All Projects',
+    description: 'List of all projects',
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'roadmap://list',
+    name: 'Roadmap Items',
+    description: 'List of all roadmap items',
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'briefings://list',
+    name: 'All Briefings',
+    description: 'List of all briefing items',
     mimeType: 'application/json',
   },
   {
@@ -306,6 +482,85 @@ async function handleToolsCall(name, args) {
       };
     }
 
+    // ── Projects ──
+    case 'list_projects': {
+      const projects = await apiGet('/api/projects');
+      let pf = projects;
+      if (args?.status) pf = pf.filter(p => p.status === args.status);
+      if (args?.department) pf = pf.filter(p => p.department === args.department);
+      return { content: [{ type: 'text', text: JSON.stringify(pf, null, 2) }] };
+    }
+
+    case 'get_project': {
+      return { content: [{ type: 'text', text: JSON.stringify(await apiGet(`/api/projects/${args.id}`), null, 2) }] };
+    }
+
+    case 'create_project': {
+      const p = await apiPost('/api/projects', args);
+      return { content: [{ type: 'text', text: JSON.stringify(p, null, 2) }] };
+    }
+
+    case 'update_project': {
+      const { id, ...updates } = args;
+      const up = await apiGet(`/api/projects/${id}`);
+      const merged = { ...up, ...updates };
+      const result = await apiPost(`/api/projects/${id}`, merged);
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    }
+
+    case 'delete_project': {
+      await apiDelete(`/api/projects/${args.id}`);
+      return { content: [{ type: 'text', text: `Project ${args.id} deleted` }] };
+    }
+
+    // ── Roadmap ──
+    case 'list_roadmap': {
+      const roadmap = await apiGet('/api/roadmap');
+      let rf = roadmap;
+      if (args?.department) rf = rf.filter(r => r.department === args.department);
+      if (args?.quarter) rf = rf.filter(r => r.quarter === args.quarter);
+      if (args?.year) rf = rf.filter(r => r.year === args.year);
+      if (args?.status) rf = rf.filter(r => r.status === args.status);
+      return { content: [{ type: 'text', text: JSON.stringify(rf, null, 2) }] };
+    }
+
+    case 'add_roadmap_item': {
+      const ri = await apiPost('/api/roadmap', args);
+      return { content: [{ type: 'text', text: JSON.stringify(ri, null, 2) }] };
+    }
+
+    case 'update_roadmap_item': {
+      const { id: rid, ...rupdates } = args;
+      const rItem = await apiGet(`/api/roadmap/${rid}`);
+      const rMerged = { ...rItem, ...rupdates };
+      const rResult = await apiPost(`/api/roadmap/${rid}`, rMerged);
+      return { content: [{ type: 'text', text: JSON.stringify(rResult, null, 2) }] };
+    }
+
+    case 'delete_roadmap_item': {
+      await apiDelete(`/api/roadmap/${args.id}`);
+      return { content: [{ type: 'text', text: `Roadmap item ${args.id} deleted` }] };
+    }
+
+    // ── Briefing ──
+    case 'list_briefings': {
+      const briefings = await apiGet('/api/briefings');
+      let bf = briefings;
+      if (args?.category && args.category !== 'all') bf = bf.filter(b => b.category === args.category);
+      if (args?.limit) bf = bf.slice(0, args.limit);
+      return { content: [{ type: 'text', text: JSON.stringify(bf, null, 2) }] };
+    }
+
+    case 'add_briefing': {
+      const br = await apiPost('/api/briefings', args);
+      return { content: [{ type: 'text', text: JSON.stringify(br, null, 2) }] };
+    }
+
+    case 'delete_briefing': {
+      await apiDelete(`/api/briefings/${args.id}`);
+      return { content: [{ type: 'text', text: `Briefing ${args.id} deleted` }] };
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -332,6 +587,27 @@ async function handleResourcesRead(uri) {
         mimeType: 'application/json',
         text: JSON.stringify(['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations']),
       }],
+    };
+  }
+
+  if (uri === 'projects://list') {
+    const projects = await apiGet('/api/projects');
+    return {
+      contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(projects, null, 2) }],
+    };
+  }
+
+  if (uri === 'roadmap://list') {
+    const roadmap = await apiGet('/api/roadmap');
+    return {
+      contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(roadmap, null, 2) }],
+    };
+  }
+
+  if (uri === 'briefings://list') {
+    const briefings = await apiGet('/api/briefings');
+    return {
+      contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(briefings, null, 2) }],
     };
   }
 

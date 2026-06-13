@@ -84,3 +84,52 @@ export interface WhisperModel {
   downloaded: boolean;
   url: string;
 }
+
+// ── Working Station Types ──
+
+export type ProjectStatus = 'planning' | 'active' | 'paused' | 'completed' | 'cancelled';
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  department: Department;
+  status: ProjectStatus;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  startDate: string;
+  targetDate: string;
+  completedDate?: string;
+  progress: number;
+  lead: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoadmapItem {
+  id: string;
+  title: string;
+  description: string;
+  module: string;
+  quarter: string;
+  year: number;
+  department: Department;
+  status: 'planned' | 'in-progress' | 'completed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  featureIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BriefingItem {
+  id: string;
+  category: 'news' | 'competitor' | 'tech';
+  title: string;
+  summary: string;
+  source: string;
+  url: string;
+  date: string;
+  tags: string[];
+}
+
+export type WorkingTab = 'dashboard' | 'upload' | 'history' | 'projects' | 'roadmap' | 'briefing' | 'assistant' | 'settings';

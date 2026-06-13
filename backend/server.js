@@ -5,13 +5,11 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import {
-  getAllMeetings,
-  getMeeting,
-  createMeeting,
-  updateMeeting,
-  deleteMeeting,
-  loadSettings as loadDbSettings,
-  saveSettings as saveDbSettings,
+  getAllMeetings, getMeeting, createMeeting, updateMeeting, deleteMeeting,
+  getAllProjects, getProject, createProject, updateProject, deleteProject,
+  getAllRoadmapItems, getRoadmapItem, createRoadmapItem, updateRoadmapItem, deleteRoadmapItem,
+  getAllBriefings, getBriefing, createBriefing, deleteBriefing,
+  loadSettings as loadDbSettings, saveSettings as saveDbSettings,
 } from './database.js';
 import { transcribe, listModels, downloadModel, getWhisperStatus } from './transcriber.js';
 
@@ -193,6 +191,53 @@ ACTION_ITEMS: (รายการคั่นด้วย |)`;
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Projects ──
+
+app.get('/api/projects', (_req, res) => res.json(getAllProjects()));
+app.get('/api/projects/:id', (req, res) => {
+  const p = getProject(req.params.id);
+  p ? res.json(p) : res.status(404).json({ error: 'Not found' });
+});
+app.post('/api/projects', (req, res) => res.status(201).json(createProject(req.body)));
+app.put('/api/projects/:id', (req, res) => {
+  const p = updateProject(req.params.id, req.body);
+  p ? res.json(p) : res.status(404).json({ error: 'Not found' });
+});
+app.delete('/api/projects/:id', (req, res) => {
+  deleteProject(req.params.id);
+  res.json({ success: true });
+});
+
+// ── Roadmap ──
+
+app.get('/api/roadmap', (_req, res) => res.json(getAllRoadmapItems()));
+app.get('/api/roadmap/:id', (req, res) => {
+  const r = getRoadmapItem(req.params.id);
+  r ? res.json(r) : res.status(404).json({ error: 'Not found' });
+});
+app.post('/api/roadmap', (req, res) => res.status(201).json(createRoadmapItem(req.body)));
+app.put('/api/roadmap/:id', (req, res) => {
+  const r = updateRoadmapItem(req.params.id, req.body);
+  r ? res.json(r) : res.status(404).json({ error: 'Not found' });
+});
+app.delete('/api/roadmap/:id', (req, res) => {
+  deleteRoadmapItem(req.params.id);
+  res.json({ success: true });
+});
+
+// ── Briefing ──
+
+app.get('/api/briefings', (_req, res) => res.json(getAllBriefings()));
+app.get('/api/briefings/:id', (req, res) => {
+  const b = getBriefing(req.params.id);
+  b ? res.json(b) : res.status(404).json({ error: 'Not found' });
+});
+app.post('/api/briefings', (req, res) => res.status(201).json(createBriefing(req.body)));
+app.delete('/api/briefings/:id', (req, res) => {
+  deleteBriefing(req.params.id);
+  res.json({ success: true });
 });
 
 // ── Health ──
