@@ -240,6 +240,175 @@ app.delete('/api/briefings/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ── Jira Integration ──
+
+function getJiraConfig() {
+  const settings = loadDbSettings();
+  return settings.jira || { url: '', email: '', token: '' };
+}
+
+function jiraHeaders(config) {
+  const encoded = Buffer.from(`${config.email}:${config.token}`).toString('base64');
+  return {
+    Authorization: `Basic ${encoded}`,
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
+}
+
+async function jiraFetch(config, path) {
+  const url = `${config.url.replace(/\/+$/, '')}${path}`;
+  const res = await fetch(url, { headers: jiraHeaders(config) });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Jira ${res.status}: ${text || res.statusText}`);
+  }
+  return res.json();
+}
+
+app.get('/api/jira/config', (_req, res) => {
+  const config = getJiraConfig();
+  res.json({ url: config.url, email: config.email, hasToken: !!config.token });
+});
+
+app.post('/api/jira/config', (req, res) => {
+  const { url, email, token } = req.body;
+  const settings = loadDbSettings();
+  settings.jira = { url: url || '', email: email || '', token: token || '' };
+  saveSettings(settings);
+  res.json({ success: true });
+});
+
+app.get('/api/jira/test', async (_req, res) => {
+  try {
+    const config = getJiraConfig();
+    if (!config.url || !config.email || !config.token) {
+      return res.status(400).json({ error: 'Jira not configured' });
+    }
+    const data = await jiraFetch(config, '/rest/api/3/project');
+    res.json({ success: true, projectCount: data.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/jira/projects', async (_req, res) => {
+  try {
+    const config = getJiraConfig();
+    const data = await jiraFetch(config, '/rest/api/3/project');
+    res.json(data.map(p => ({
+      key: p.key, name: p.name, lead: p.lead?.displayName || '',
+      category: p.projectCategory?.name || '', avatarUrl: p.avatarUrls?.['48x48'] || '',
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/jira/issues', async (req, res) => {
+  try {
+    const config = getJiraConfig();
+    const jql = req.query.jql || '';
+    const maxResults = parseInt(req.query.maxResults) || 50;
+    if (!jql) return res.status(400).json({ error: 'JQL query required' });
+    const data = await jiraFetch(config, `/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}`);
+    res.json({
+      total: data.total,
+      issues: data.issues.map(i => ({
+        key: i.key, summary: i.fields.summary,
+        status: i.fields.status?.name || '', statusCategory: i.fields.status?.statusCategory?.name || '',
+        assignee: i.fields.assignee?.displayName || '',
+        reporter: i.fields.reporter?.displayName || '',
+        priority: i.fields.priority?.name || '',
+        labels: i.fields.labels || [],
+        created: i.fields.created, updated: i.fields.updated, duedate: i.fields.duedate || '',
+        fixVersions: (i.fields.fixVersions || []).map(v => v.name),
+        storyPoints: i.fields.customfield_10016 || i.fields.customfield_10002 || null,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/jira/issue/:key', async (req, res) => {
+  try {
+    const config = getJiraConfig();
+    const data = await jiraFetch(config, `/rest/api/3/issue/${req.params.key}`);
+    res.json({
+      key: data.key, summary: data.fields.summary,
+      description: data.fields.description,
+      status: data.fields.status?.name || '',
+      assignee: data.fields.assignee?.displayName || '',
+      reporter: data.fields.reporter?.displayName || '',
+      priority: data.fields.priority?.name || '',
+      labels: data.fields.labels || [],
+      created: data.fields.created, updated: data.fields.updated, duedate: data.fields.duedate || '',
+      fixVersions: (data.fields.fixVersions || []).map(v => v.name),
+      components: (data.fields.components || []).map(c => c.name),
+      subtasks: (data.fields.subtasks || []).map(s => ({ key: s.key, summary: s.fields?.summary, status: s.fields?.status?.name })),
+      storyPoints: data.fields.customfield_10016 || data.fields.customfield_10002 || null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/jira/sprint/:boardId', async (req, res) => {
+  try {
+    const config = getJiraConfig();
+    const boardId = parseInt(req.params.boardId);
+    const sprints = await jiraFetch(config, `/rest/agile/1.0/board/${boardId}/sprint?state=active`);
+    const sprint = sprints.values?.[0];
+    if (!sprint) return res.json({ sprint: null, issues: [] });
+    const issuesData = await jiraFetch(config, `/rest/agile/1.0/sprint/${sprint.id}/issue`);
+    const issues = issuesData.issues.map(i => ({
+      key: i.key, summary: i.fields.summary,
+      status: i.fields.status?.name || '',
+      statusCategory: i.fields.status?.statusCategory?.name || '',
+      assignee: i.fields.assignee?.displayName || '',
+      priority: i.fields.priority?.name || '',
+      storyPoints: i.fields.customfield_10016 || i.fields.customfield_10002 || null,
+    }));
+    const statusCounts = {};
+    issues.forEach(i => { statusCounts[i.status] = (statusCounts[i.status] || 0) + 1; });
+    const totalPoints = issues.reduce((s, i) => s + (i.storyPoints || 0), 0);
+    const donePoints = issues.filter(i => i.statusCategory === 'Done').reduce((s, i) => s + (i.storyPoints || 0), 0);
+    res.json({
+      sprint: { id: sprint.id, name: sprint.name, goal: sprint.goal || '', startDate: sprint.startDate, endDate: sprint.endDate },
+      total: issues.length, totalPoints, donePoints,
+      statusCounts, issues,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/jira/stats', async (req, res) => {
+  try {
+    const config = getJiraConfig();
+    const project = req.query.project || '';
+    const jql = project ? `project = ${project}` : '';
+    if (!jql) return res.status(400).json({ error: 'Project key required' });
+    const data = await jiraFetch(config, `/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=200`);
+    const byStatus = {}; const byPriority = {}; const byAssignee = {};
+    let totalPoints = 0;
+    data.issues.forEach(i => {
+      const s = i.fields.status?.name || 'Unknown';
+      const p = i.fields.priority?.name || 'None';
+      const a = i.fields.assignee?.displayName || 'Unassigned';
+      const pts = i.fields.customfield_10016 || i.fields.customfield_10002 || 0;
+      byStatus[s] = (byStatus[s] || 0) + 1;
+      byPriority[p] = (byPriority[p] || 0) + 1;
+      byAssignee[a] = (byAssignee[a] || 0) + 1;
+      totalPoints += pts;
+    });
+    res.json({ total: data.total, totalPoints, byStatus, byPriority, byAssignee });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Health ──
 
 app.get('/api/health', (_req, res) => {

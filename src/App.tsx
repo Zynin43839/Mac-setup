@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Upload, FolderOpen, GitBranch, Target, Newspaper,
-  Bot, Settings, Menu, X, Sparkles
+  Bot, Settings, Menu, X, Sparkles, Bug
 } from 'lucide-react';
 import FileUploader from './components/FileUploader';
 import MeetingHistory from './components/MeetingHistory';
@@ -12,6 +12,7 @@ import Dashboard from './modules/Dashboard';
 import Projects from './modules/Projects';
 import Roadmap from './modules/Roadmap';
 import Briefing from './modules/Briefing';
+import JiraDashboard from './modules/JiraDashboard';
 import { Meeting, WorkingTab } from './types';
 import { loadMeetings } from './store';
 
@@ -36,6 +37,7 @@ const navGroups = [
     label: 'Tools',
     items: [
       { id: 'assistant' as WorkingTab, label: 'AI Assistant', icon: Bot, color: 'border-l-cyan-400' },
+      { id: 'jira' as WorkingTab, label: 'Jira', icon: Bug, color: 'border-l-blue-400' },
       { id: 'settings' as WorkingTab, label: 'Settings', icon: Settings, color: 'border-l-yellow-400' },
     ],
   },
@@ -228,6 +230,7 @@ export default function App() {
                 {activeTab === 'projects' && <Projects />}
                 {activeTab === 'roadmap' && <Roadmap />}
                 {activeTab === 'briefing' && <Briefing />}
+                {activeTab === 'jira' && <JiraDashboard />}
                 {activeTab === 'assistant' && <AIAssistant />}
                 {activeTab === 'settings' && <SettingsPanel />}
               </motion.div>

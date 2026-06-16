@@ -371,3 +371,49 @@ export function getAudioDuration(file: File): Promise<number> {
     audio.src = URL.createObjectURL(file);
   });
 }
+
+// ── Jira API ──
+
+export interface JiraConfig {
+  url: string;
+  email: string;
+  token: string;
+}
+
+export function getJiraConfig(): JiraConfig {
+  try {
+    const raw = localStorage.getItem('jira_config');
+    return raw ? JSON.parse(raw) : { url: '', email: '', token: '' };
+  } catch { return { url: '', email: '', token: '' }; }
+}
+
+export function saveJiraConfig(config: JiraConfig) {
+  localStorage.setItem('jira_config', JSON.stringify(config));
+  apiCall('/jira/config', { method: 'POST', body: JSON.stringify(config) });
+}
+
+export async function testJiraConnection() {
+  return apiCall('/jira/test');
+}
+
+export async function loadJiraProjects() {
+  const data = await apiCall('/jira/projects');
+  return data || [];
+}
+
+export async function loadJiraIssues(jql: string, maxResults = 50) {
+  const data = await apiCall(`/jira/issues?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}`);
+  return data || { total: 0, issues: [] };
+}
+
+export async function loadJiraIssue(key: string) {
+  return apiCall(`/jira/issue/${key}`);
+}
+
+export async function loadJiraSprint(boardId: number) {
+  return apiCall(`/jira/sprint/${boardId}`);
+}
+
+export async function loadJiraStats(project: string) {
+  return apiCall(`/jira/stats?project=${project}`);
+}

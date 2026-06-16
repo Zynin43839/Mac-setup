@@ -1,12 +1,87 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Key, Eye, EyeOff, Check, AlertCircle, HardDrive, Cpu, Info, Download } from 'lucide-react';
+import { Settings, Key, Eye, EyeOff, Check, AlertCircle, HardDrive, Cpu, Info, Download, Bug, Link, RefreshCw } from 'lucide-react';
 import { STTSettings, STTProvider, WhisperModel } from '../types';
-import { loadSettings, saveSettings, hasValidKey, fetchModels, downloadModelFile, formatFileSize } from '../store';
+import { loadSettings, saveSettings, hasValidKey, fetchModels, downloadModelFile, formatFileSize, getJiraConfig, saveJiraConfig, testJiraConnection } from '../store';
 import { providers, modelOptions, languageOptions } from '../data/providers';
 
 interface Props {
   onSettingsChange?: (settings: STTSettings) => void;
+}
+
+function JiraConfigSection() {
+  const [config, setConfig] = useState(() => getJiraConfig());
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<'idle' | 'ok' | 'fail'>('idle');
+
+  const handleSaveJira = () => {
+    saveJiraConfig(config);
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult('idle');
+    saveJiraConfig(config);
+    try {
+      const result = await testJiraConnection();
+      setTestResult(result === null ? 'fail' : 'ok');
+    } catch {
+      setTestResult('fail');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="neo-card-sm p-4 space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label className="text-slate-400 text-xs font-bold mb-1.5 block">Jira URL</label>
+          <input
+            type="text"
+            value={config.url}
+            onChange={e => setConfig(c => ({ ...c, url: e.target.value }))}
+            placeholder="https://your-domain.atlassian.net"
+            className="neo-input w-full px-3 py-2 text-xs font-mono placeholder:text-slate-600"
+          />
+        </div>
+        <div>
+          <label className="text-slate-400 text-xs font-bold mb-1.5 block">Email</label>
+          <input
+            type="email"
+            value={config.email}
+            onChange={e => setConfig(c => ({ ...c, email: e.target.value }))}
+            placeholder="you@company.com"
+            className="neo-input w-full px-3 py-2 text-xs font-mono placeholder:text-slate-600"
+          />
+        </div>
+        <div>
+          <label className="text-slate-400 text-xs font-bold mb-1.5 block">API Token</label>
+          <input
+            type="password"
+            value={config.token}
+            onChange={e => setConfig(c => ({ ...c, token: e.target.value }))}
+            placeholder="ATATT3..."
+            className="neo-input w-full px-3 py-2 text-xs font-mono placeholder:text-slate-600"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button onClick={handleTest} disabled={testing || !config.url}
+          className="neo-btn text-xs font-bold px-3 py-1.5 bg-blue-500 text-white disabled:opacity-50 flex items-center gap-1">
+          {testing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Link className="w-3 h-3" />}
+          {testing ? 'Testing...' : 'Test Connection'}
+        </button>
+        <button onClick={handleSaveJira}
+          className="neo-btn text-xs font-bold px-3 py-1.5 bg-[#25253e] text-white hover:bg-amber-500 hover:text-white">
+          Save Config
+        </button>
+        {testResult === 'ok' && <span className="text-emerald-400 text-xs font-bold flex items-center gap-1"><Check className="w-3 h-3" /> Connected</span>}
+        {testResult === 'fail' && <span className="text-red-400 text-xs font-bold flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Connection failed (mock mode active)</span>}
+      </div>
+    </div>
+  );
 }
 
 export default function SettingsPanel({ onSettingsChange }: Props) {
@@ -493,6 +568,18 @@ export default function SettingsPanel({ onSettingsChange }: Props) {
             </div>
           </motion.div>
         )}
+      </div>
+
+      {/* ── Jira Integration ── */}
+      <div className="space-y-4">
+        <h3 className="text-white font-black text-sm flex items-center gap-2">
+          <Bug className="w-4 h-4 text-blue-400" />
+          Jira Integration
+        </h3>
+        <p className="text-slate-400 text-xs font-medium">
+          เชื่อมต่อ Atlassian Jira Cloud เพื่อดึง Project, Issue, Sprint มาแสดงใน Dashboard — ข้อมูลจำลองจะแสดงถ้ายังไม่ได้ตั้งค่า
+        </p>
+        <JiraConfigSection />
       </div>
 
       {/* Save Button */}

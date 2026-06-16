@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
   BarChart3, FolderOpen, Target, Newspaper, ArrowUpRight, Clock,
-  Sparkles, ChevronRight, Activity, GitBranch, Upload
+  Sparkles, ChevronRight, Activity, GitBranch, Upload, Bug,
+  CheckCircle2, Circle, AlertCircle
 } from 'lucide-react';
 import { loadMeetings } from '../store';
 import { loadProjects, loadRoadmapItems, loadBriefings } from '../store';
@@ -78,6 +79,24 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: string) =>
       </div>
 
       {loading && <p className="text-slate-500 text-center py-8">Loading...</p>}
+
+      {/* Jira Stats Widget */}
+      <div className="neo-card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <Bug className="w-4 h-4 text-blue-400" /> Jira Overview
+          </h2>
+          <button onClick={() => onNavigate('jira')} className="text-amber-400 hover:text-amber-300 text-xs font-bold flex items-center gap-1">
+            Open Jira <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <JiraMiniStat label="Total Issues" value="60" icon={BarChart3} color="from-blue-500 to-blue-600" />
+          <JiraMiniStat label="In Progress" value="18" icon={AlertCircle} color="from-amber-500 to-orange-500" />
+          <JiraMiniStat label="Done This Sprint" value="12" icon={CheckCircle2} color="from-emerald-500 to-teal-500" />
+          <JiraMiniStat label="Open Bugs" value="5" icon={Circle} color="from-red-500 to-rose-500" />
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Meetings */}
@@ -193,6 +212,19 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: string) =>
           <p className="text-[10px] text-slate-500">News digest</p>
         </button>
       </div>
+    </div>
+  );
+}
+
+function JiraMiniStat({ label, value, icon: Icon, color }: { label: string; value: string; icon: any; color: string }) {
+  return (
+    <div className="neo-card-sm p-3 relative overflow-hidden">
+      <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${color}`} />
+      <div className="flex items-center gap-2">
+        <Icon className="w-4 h-4 shrink-0 text-slate-300" />
+        <span className="text-xs font-bold text-slate-400">{label}</span>
+      </div>
+      <p className="text-xl font-black text-white mt-1">{value}</p>
     </div>
   );
 }

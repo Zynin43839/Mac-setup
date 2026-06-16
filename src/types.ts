@@ -132,4 +132,4 @@ export interface BriefingItem {
   tags: string[];
 }
 
-export type WorkingTab = 'dashboard' | 'upload' | 'history' | 'projects' | 'roadmap' | 'briefing' | 'assistant' | 'settings';
+export type WorkingTab = 'dashboard' | 'upload' | 'history' | 'projects' | 'roadmap' | 'briefing' | 'jira' | 'assistant' | 'settings';
