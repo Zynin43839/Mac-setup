@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Bug, BarChart3, Calendar, Users, Search,
-  CheckCircle2, Circle, Clock, Target
+  CheckCircle2, Circle, Clock, Target, AlertTriangle,
+  Share2, Layers, UserCheck, Zap
 } from 'lucide-react';
 import { getJiraConfig } from '../store';
 
@@ -10,19 +11,38 @@ interface MockIssue {
   assignee: string; priority: string; labels: string[];
   created: string; duedate: string; fixVersions: string[];
   storyPoints: number | null;
+  project?: string;
 }
 
 const MOCK_PROJECTS = [
-  { key: 'LMS', name: 'Learning Management System', lead: 'Somchai W.', category: 'Product' },
-  { key: 'PORTAL', name: 'Employee Portal', lead: 'Ananya K.', category: 'Platform' },
-  { key: 'MOBILE', name: 'Mobile App', lead: 'Phattara J.', category: 'Product' },
-  { key: 'INFRA', name: 'Infrastructure', lead: 'Kittipong C.', category: 'Engineering' },
+  { key: 'LMS', name: 'Learning Management System', lead: 'Somchai W.', category: 'Product', tech: 'React, Node, PostgreSQL' },
+  { key: 'PORTAL', name: 'Employee Portal', lead: 'Ananya K.', category: 'Platform', tech: 'React, Node, PostgreSQL' },
+  { key: 'MOBILE', name: 'Mobile App', lead: 'Phattara J.', category: 'Product', tech: 'React Native, GraphQL' },
+  { key: 'INFRA', name: 'Infrastructure', lead: 'Kittipong C.', category: 'Engineering', tech: 'Terraform, AWS, Docker' },
 ];
 
 const MOCK_STATUSES = ['To Do', 'In Progress', 'Review', 'Testing', 'Done'];
 const MOCK_PRIORITIES = ['Highest', 'High', 'Medium', 'Low', 'Lowest'];
 const MOCK_ASSIGNEES = ['Somchai W.', 'Ananya K.', 'Phattara J.', 'Kittipong C.', 'Supaporn L.', 'Unassigned'];
 const MOCK_VERSIONS = ['v1.0', 'v1.1', 'v2.0', 'Sprint 1', 'Sprint 2', 'Sprint 3'];
+
+// Assignees mapped to projects they work on
+const ASSIGNEE_PROJECTS: Record<string, string[]> = {
+  'Somchai W.': ['LMS', 'PORTAL'],
+  'Ananya K.': ['PORTAL', 'MOBILE'],
+  'Phattara J.': ['MOBILE', 'LMS'],
+  'Kittipong C.': ['INFRA', 'LMS', 'PORTAL'],
+  'Supaporn L.': ['LMS', 'MOBILE'],
+  'Unassigned': [],
+};
+
+// Shared components across projects
+const SHARED_COMPONENTS = [
+  { name: 'Authentication Service', projects: ['LMS', 'PORTAL', 'MOBILE'], icon: '🔐' },
+  { name: 'Notification System', projects: ['LMS', 'PORTAL'], icon: '🔔' },
+  { name: 'API Gateway', projects: ['LMS', 'PORTAL', 'MOBILE', 'INFRA'], icon: '🌐' },
+  { name: 'File Storage Module', projects: ['LMS', 'PORTAL'], icon: '📁' },
+];
 
 function rand(min: number, max: number) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 function pick<T>(arr: T[]): T { return arr[rand(0, arr.length - 1)]; }
@@ -49,6 +69,7 @@ function generateMockIssues(project: string, count: number): MockIssue[] {
       duedate: rand(0, 1) ? new Date(2025, 5, rand(1, 30)).toISOString().split('T')[0] : '',
       fixVersions: rand(0, 1) ? [pick(MOCK_VERSIONS)] : [],
       storyPoints: rand(0, 1) ? rand(1, 13) : null,
+      project,
     };
   });
 }
@@ -158,6 +179,45 @@ export default function JiraDashboard() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // Generate cross-project issues for deadline alerts
+  const allProjectIssues = useMemo(() =>
+    MOCK_PROJECTS.flatMap(p => generateMockIssues(p.key, rand(15, 30))),
+  []);
+
+  // Calculate deadline info
+  const today = new Date(2025, 4, 15); // Mock today: May 15, 2025
+  const in7Days = new Date(today);
+  in7Days.setDate(in7Days.getDate() + 7);
+
+  const upcomingDeadlines = allProjectIssues
+    .filter(i => i.duedate && new Date(i.duedate) >= today && new Date(i.duedate) <= in7Days)
+    .sort((a, b) => new Date(a.duedate).getTime() - new Date(b.duedate).getTime());
+
+  const overdueItems = allProjectIssues
+    .filter(i => i.duedate && new Date(i.duedate) < today && i.statusCategory !== 'Done')
+    .sort((a, b) => new Date(a.duedate).getTime() - new Date(b.duedate).getTime());
+
+  // Projects nearing their mock target date
+  const projectDeadlines = [
+    { key: 'LMS', name: 'Learning Management System', targetDate: '2025-05-30', progress: 65, lead: 'Somchai W.' },
+    { key: 'PORTAL', name: 'Employee Portal', targetDate: '2025-05-20', progress: 80, lead: 'Ananya K.' },
+    { key: 'MOBILE', name: 'Mobile App', targetDate: '2025-06-15', progress: 40, lead: 'Phattara J.' },
+    { key: 'INFRA', name: 'Infrastructure', targetDate: '2025-05-10', progress: 90, lead: 'Kittipong C.' },
+  ].map(p => ({
+    ...p,
+    daysLeft: Math.ceil((new Date(p.targetDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+  }));
+
+  // Shared assignee analysis
+  const sharedAssigneeData = Object.entries(ASSIGNEE_PROJECTS)
+    .filter(([, projs]) => projs.length > 1)
+    .map(([name, projs]) => ({
+      name,
+      projects: projs,
+      totalIssues: allProjectIssues.filter(i => i.assignee === name).length,
+    }))
+    .sort((a, b) => b.totalIssues - a.totalIssues);
+
   const filteredIssues = issues
     .filter(i => statusFilter === 'all' || i.status === statusFilter)
     .filter(i => i.key.toLowerCase().includes(search.toLowerCase()) || i.summary.toLowerCase().includes(search.toLowerCase()));
@@ -194,6 +254,82 @@ export default function JiraDashboard() {
         <StatCard label="Story Points" value={stats.totalPoints} icon={Target} color="from-violet-500 to-purple-500" />
       </div>
 
+      {/* Deadline Alerts */}
+      <div className="neo-card p-4 border-l-[3px] border-l-red-400">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400" /> Deadline Alerts
+          </h3>
+          <span className="text-xs text-slate-500">Mock date: May 15, 2025</span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Overdue Items */}
+          <div className="p-3 rounded-lg bg-red-500/10 border border-red-400/30">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-red-400" />
+              <span className="text-xs font-bold text-red-300">Overdue ({overdueItems.length})</span>
+            </div>
+            {overdueItems.length === 0 ? (
+              <p className="text-xs text-slate-500">No overdue items</p>
+            ) : (
+              <div className="space-y-1">
+                {overdueItems.slice(0, 4).map(i => (
+                  <div key={i.key} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300 font-bold">{i.key}</span>
+                    <span className="text-red-300">{i.duedate}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Upcoming Deadlines (7 days) */}
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-400/30">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold text-amber-300">Due within 7 days ({upcomingDeadlines.length})</span>
+            </div>
+            {upcomingDeadlines.length === 0 ? (
+              <p className="text-xs text-slate-500">No upcoming deadlines</p>
+            ) : (
+              <div className="space-y-1">
+                {upcomingDeadlines.slice(0, 4).map(i => (
+                  <div key={i.key} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300 font-bold">{i.key}</span>
+                    <span className="text-amber-300">{i.duedate}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Project Deadlines */}
+          <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-400/30">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="w-4 h-4 text-violet-400" />
+              <span className="text-xs font-bold text-violet-300">Project Deadlines</span>
+            </div>
+            <div className="space-y-1.5">
+              {projectDeadlines.sort((a, b) => a.daysLeft - b.daysLeft).map(p => (
+                <div key={p.key}>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300 font-bold">{p.key}</span>
+                    <span className={`font-bold ${p.daysLeft <= 0 ? 'text-red-400' : p.daysLeft <= 7 ? 'text-amber-400' : 'text-slate-500'}`}>
+                      {p.daysLeft <= 0 ? 'OVERDUE' : `${p.daysLeft}d left`}
+                    </span>
+                  </div>
+                  <div className="w-full h-1 rounded-full bg-[#1a1a2e] mt-0.5 overflow-hidden">
+                    <div className={`h-full rounded-full ${p.daysLeft <= 0 ? 'bg-red-500' : p.daysLeft <= 7 ? 'bg-amber-500' : 'bg-violet-500'}`}
+                      style={{ width: `${p.progress}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="neo-card p-4">
@@ -213,6 +349,96 @@ export default function JiraDashboard() {
             <Users className="w-4 h-4 text-amber-400" /> Assignee Workload
           </h3>
           <BarChart data={stats.byAssignee} color="#8b5cf6" />
+        </div>
+      </div>
+
+      {/* Shared Resources */}
+      <div className="neo-card p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <Share2 className="w-4 h-4 text-emerald-400" /> Shared Resources
+          </h3>
+          <span className="text-xs text-slate-500">Cross-project dependencies</span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Shared Assignees */}
+          <div className="p-3 rounded-lg bg-[#25253e]/60 border border-[#3d3d5c]/50">
+            <h4 className="text-xs font-bold text-emerald-300 mb-2 flex items-center gap-1.5">
+              <UserCheck className="w-3.5 h-3.5" /> Shared Assignees
+            </h4>
+            <div className="space-y-2">
+              {sharedAssigneeData.slice(0, 4).map(a => (
+                <div key={a.name}>
+                  <div className="flex items-center justify-between text-xs mb-0.5">
+                    <span className="text-white font-bold">{a.name}</span>
+                    <span className="text-slate-400">{a.totalIssues} issues</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {a.projects.map(p => {
+                      const color = p === 'LMS' ? 'text-amber-300' : p === 'PORTAL' ? 'text-cyan-300' : p === 'MOBILE' ? 'text-pink-300' : 'text-green-300';
+                      return <span key={p} className={`text-[9px] font-bold px-1 py-0.5 rounded bg-[#1a1a2e] border border-[#3d3d5c] ${color}`}>{p}</span>;
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Shared Components */}
+          <div className="p-3 rounded-lg bg-[#25253e]/60 border border-[#3d3d5c]/50">
+            <h4 className="text-xs font-bold text-cyan-300 mb-2 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5" /> Shared Components
+            </h4>
+            <div className="space-y-2">
+              {SHARED_COMPONENTS.map(c => (
+                <div key={c.name}>
+                  <div className="flex items-center gap-1.5 text-xs mb-0.5">
+                    <span>{c.icon}</span>
+                    <span className="text-white font-bold">{c.name}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {c.projects.map(p => {
+                      const color = p === 'LMS' ? 'text-amber-300' : p === 'PORTAL' ? 'text-cyan-300' : p === 'MOBILE' ? 'text-pink-300' : 'text-green-300';
+                      return <span key={p} className={`text-[9px] font-bold px-1 py-0.5 rounded bg-[#1a1a2e] border border-[#3d3d5c] ${color}`}>{p}</span>;
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tech Stack Overlap */}
+          <div className="p-3 rounded-lg bg-[#25253e]/60 border border-[#3d3d5c]/50">
+            <h4 className="text-xs font-bold text-purple-300 mb-2 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5" /> Tech Stack Overlap
+            </h4>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-white font-bold">React/Node</span>
+              </div>
+              <p className="text-[10px] text-slate-400 ml-4">Shared by: <span className="text-amber-300">LMS</span>, <span className="text-cyan-300">PORTAL</span></p>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full bg-pink-400 shrink-0" />
+                <span className="text-white font-bold">React Native</span>
+              </div>
+              <p className="text-[10px] text-slate-400 ml-4">Shared by: <span className="text-pink-300">MOBILE</span> (sole)</p>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+                <span className="text-white font-bold">PostgreSQL</span>
+              </div>
+              <p className="text-[10px] text-slate-400 ml-4">Shared by: <span className="text-amber-300">LMS</span>, <span className="text-cyan-300">PORTAL</span></p>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                <span className="text-white font-bold">Docker / AWS</span>
+              </div>
+              <p className="text-[10px] text-slate-400 ml-4">Shared by: <span className="text-green-300">INFRA</span> (all projects)</p>
+            </div>
+          </div>
         </div>
       </div>
 

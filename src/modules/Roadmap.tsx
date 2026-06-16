@@ -1,54 +1,144 @@
 import { useState, useEffect } from 'react';
-import { Plus, Target, Filter, Trash2, Circle, CheckCircle2, Clock } from 'lucide-react';
-import { loadRoadmapItems, createRoadmapItemAPI, updateRoadmapItemAPI, deleteRoadmapItemAPI } from '../store';
+import { Plus, Target, Filter, Trash2, Circle, CheckCircle2, Clock, Bug, Calendar, Layers, RefreshCw } from 'lucide-react';
+import { loadRoadmapItems, createRoadmapItemAPI, updateRoadmapItemAPI, deleteRoadmapItemAPI, getJiraConfig } from '../store';
 import { RoadmapItem } from '../types';
 
 const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
 const departments = ['Engineering', 'Product', 'Design', 'Marketing', 'Sales', 'HR', 'Finance'];
 const modules = ['Dashboard', 'Meetings', 'Projects', 'Roadmap', 'Briefing', 'Assistant', 'Settings', 'API'];
+const statusIcons: Record<string, typeof Circle> = { planned: Circle, 'in-progress': Clock, completed: CheckCircle2, cancelled: Circle };
+const statusColors: Record<string, string> = { planned: 'text-slate-500', 'in-progress': 'text-amber-400', completed: 'text-emerald-400', cancelled: 'text-red-400' };
 
-const statusIcons: Record<string, typeof Circle> = {
-  planned: Circle,
-  'in-progress': Clock,
-  completed: CheckCircle2,
-  cancelled: Circle,
-};
-
-const statusColors: Record<string, string> = {
-  planned: 'text-slate-500',
-  'in-progress': 'text-amber-400',
-  completed: 'text-emerald-400',
-  cancelled: 'text-red-400',
-};
+const JIRA_VERSIONS_MOCK = [
+  { name: 'Sprint 1 — Q2 2025', releaseDate: '2025-05-19', status: 'in-progress', issuesCount: 12, doneCount: 5, description: 'Core infrastructure & auth' },
+  { name: 'Sprint 2 — Q2 2025', releaseDate: '2025-06-02', status: 'planned', issuesCount: 15, doneCount: 0, description: 'Payment & reporting' },
+  { name: 'Sprint 3 — Q2 2025', releaseDate: '2025-06-16', status: 'planned', issuesCount: 14, doneCount: 0, description: 'Mobile responsive & SSO' },
+  { name: 'v1.0 Release', releaseDate: '2025-06-30', status: 'planned', issuesCount: 45, doneCount: 32, description: 'MVP launch' },
+  { name: 'v1.1 Hotfix', releaseDate: '2025-07-15', status: 'planned', issuesCount: 8, doneCount: 0, description: 'Post-launch fixes' },
+  { name: 'Sprint 1 — Q3 2025', releaseDate: '2025-07-21', status: 'planned', issuesCount: 18, doneCount: 0, description: 'Gamification & live streaming' },
+];
 
 export default function Roadmap() {
+  const cfg = getJiraConfig();
+  const isJiraConnected = !!(cfg.url && cfg.email && cfg.token);
+  const [mode, setMode] = useState<'local' | 'jira'>(isJiraConnected ? 'jira' : 'local');
+
   const [items, setItems] = useState<RoadmapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deptFilter, setDeptFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const currentYear = 2026;
 
-  useEffect(() => { loadRoadmapItems().then(setItems).catch(() => {}).finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    if (mode === 'local') {
+      loadRoadmapItems().then(setItems).catch(() => {}).finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, [mode]);
 
   const filtered = deptFilter === 'all' ? items : items.filter(i => i.department === deptFilter);
   const years = [...new Set(items.map(i => i.year))].sort((a, b) => b - a);
   const activeYears = years.length > 0 ? years : [currentYear];
 
-  async   function handleSave(data: any) {
-    const updated = await createRoadmapItemAPI(data);
-    setItems(updated);
-    setShowForm(false);
-  }
-
-  async function handleDelete(id: string) {
-    const updated = await deleteRoadmapItemAPI(id);
-    setItems(updated);
-  }
-
+  async function handleSave(data: any) { setItems(await createRoadmapItemAPI(data)); setShowForm(false); }
+  async function handleDelete(id: string) { setItems(await deleteRoadmapItemAPI(id)); }
   async function toggleStatus(item: RoadmapItem) {
     const next: Record<string, string> = { planned: 'in-progress', 'in-progress': 'completed', completed: 'planned', cancelled: 'planned' };
-    const updated = await updateRoadmapItemAPI(item.id, { status: next[item.status] || 'planned' });
-    setItems(updated);
+    setItems(await updateRoadmapItemAPI(item.id, { status: next[item.status] || 'planned' }));
+  }
+
+  if (mode === 'jira') {
+    const versions = JIRA_VERSIONS_MOCK;
+    const now = new Date(2025, 4, 15);
+    const grouped = [
+      { label: 'Active', versions: versions.filter(v => v.status === 'in-progress') },
+      { label: 'Upcoming', versions: versions.filter(v => v.status === 'planned' && new Date(v.releaseDate) > now) },
+      { label: 'Completed', versions: versions.filter(v => v.status === 'done') },
+    ].filter(g => g.versions.length > 0);
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
+              <Bug className="w-7 h-7 text-amber-400" /> Roadmap
+            </h1>
+            <p className="text-slate-400 text-sm mt-1 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              Connected to Jira · {versions.length} fix versions
+            </p>
+          </div>
+          <button onClick={() => setMode('local')}
+            className="neo-btn-sm bg-[#25253e] text-slate-300 border-2 border-[#3d3d5c] font-bold flex items-center gap-1.5">
+            <RefreshCw className="w-4 h-4" /> Switch to Local
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {grouped.map(group => (
+            <div key={group.label}>
+              <h3 className="text-sm font-black uppercase tracking-wider text-slate-300 mb-3">{group.label}</h3>
+              <div className="space-y-2">
+                {group.versions.map(v => {
+                  const progress = v.issuesCount > 0 ? Math.round((v.doneCount / v.issuesCount) * 100) : 0;
+                  return (
+                    <div key={v.name} className="neo-card p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${v.status === 'in-progress' ? 'bg-amber-400 animate-pulse' : v.status === 'done' ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                          <div>
+                            <h4 className="font-bold text-white">{v.name}</h4>
+                            <p className="text-xs text-slate-400">{v.description}</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-slate-500 flex items-center gap-1 shrink-0">
+                          <Calendar className="w-3 h-3" />{v.releaseDate}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <div className="flex justify-between text-[10px] mb-0.5">
+                            <span className="text-slate-500">Progress</span>
+                            <span className="text-white font-bold">{v.doneCount} / {v.issuesCount} issues ({progress}%)</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-[#1a1a2e] overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${v.status === 'in-progress' ? 'bg-gradient-to-r from-amber-500 to-emerald-400' : 'bg-slate-500'}`} style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded border ${v.status === 'in-progress' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-slate-500/20 text-slate-300 border-slate-500/30'}`}>
+                          {v.status === 'in-progress' ? 'In Progress' : v.status === 'done' ? 'Released' : 'Planned'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Timeline view */}
+        <div className="neo-card p-4">
+          <h3 className="text-sm font-black uppercase tracking-wider text-slate-300 mb-4 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-amber-400" /> Version Timeline
+          </h3>
+          <div className="relative pl-6 space-y-0">
+            {versions.map((v, i) => (
+              <div key={v.name} className="relative pb-4">
+                {i < versions.length - 1 && <div className="absolute left-[-5px] top-3 bottom-0 w-0.5 bg-[#3d3d5c]" />}
+                <div className={`absolute left-[-9px] top-1.5 w-3 h-3 rounded-full border-2 ${v.status === 'in-progress' ? 'bg-amber-400 border-amber-400' : v.status === 'done' ? 'bg-emerald-400 border-emerald-400' : 'bg-[#1a1a2e] border-slate-500'}`} />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-white">{v.name}</span>
+                  <span className="text-[10px] text-slate-500">{v.releaseDate}</span>
+                </div>
+                <p className="text-xs text-slate-400">{v.description} · {v.issuesCount} issues</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -60,21 +150,31 @@ export default function Roadmap() {
           </h1>
           <p className="text-slate-400 text-sm mt-1">{items.length} features · {items.filter(i => i.status === 'in-progress').length} in progress</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="neo-btn-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold flex items-center gap-1.5">
-          <Plus className="w-4 h-4" /> Add Item
-        </button>
+        <div className="flex items-center gap-2">
+          {isJiraConnected && (
+            <button onClick={() => setMode('jira')}
+              className="neo-btn-sm bg-emerald-600 text-white font-bold flex items-center gap-1.5">
+              <Bug className="w-4 h-4" /> Jira View
+            </button>
+          )}
+          <button onClick={() => setShowForm(true)} className="neo-btn-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold flex items-center gap-1.5">
+            <Plus className="w-4 h-4" /> Add Item
+          </button>
+        </div>
       </div>
 
-      {/* Filter */}
+      {!isJiraConnected && (
+        <div className="neo-card-sm p-3 bg-amber-500/10 border-amber-400/30 border-l-[3px] border-l-amber-400 flex items-center gap-2 text-xs text-amber-200">
+          <Bug className="w-4 h-4 shrink-0" />
+          <span><strong>Connect Jira</strong> in Settings to see Jira fix versions & sprints here</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 flex-wrap">
         <Filter className="w-4 h-4 text-slate-500" />
         {['all', ...departments].map(d => (
-          <button
-            key={d} onClick={() => setDeptFilter(d)}
-            className={`text-xs font-bold px-3 py-1.5 rounded-lg border-2 transition-all ${
-              deptFilter === d ? 'border-amber-400/60 bg-[#2a2a4a] text-amber-200' : 'border-[#3d3d5c] text-slate-400 hover:text-white'
-            }`}
-          >
+          <button key={d} onClick={() => setDeptFilter(d)}
+            className={`text-xs font-bold px-3 py-1.5 rounded-lg border-2 transition-all ${deptFilter === d ? 'border-amber-400/60 bg-[#2a2a4a] text-amber-200' : 'border-[#3d3d5c] text-slate-400 hover:text-white'}`}>
             {d === 'all' ? 'All' : d}
           </button>
         ))}
@@ -98,13 +198,10 @@ export default function Roadmap() {
                 return (
                   <div key={q} className="neo-card p-3">
                     <h3 className="text-sm font-black text-white mb-3 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-400" />
-                      {q}
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />{q}
                       <span className="text-slate-500 font-normal ml-auto">{qItems.length}</span>
                     </h3>
-                    {qItems.length === 0 ? (
-                      <p className="text-slate-600 text-xs py-4 text-center">No items</p>
-                    ) : (
+                    {qItems.length === 0 ? <p className="text-slate-600 text-xs py-4 text-center">No items</p> : (
                       <div className="space-y-2">
                         {qItems.map(item => {
                           const Icon = statusIcons[item.status] || Circle;
@@ -112,28 +209,16 @@ export default function Roadmap() {
                           return (
                             <div key={item.id} className="p-2 rounded-lg bg-[#25253e]/60 border border-[#3d3d5c]/50 group">
                               <div className="flex items-start gap-2">
-                                <button onClick={() => toggleStatus(item)} className="mt-0.5">
-                                  <Icon className={`w-4 h-4 ${sc}`} />
-                                </button>
+                                <button onClick={() => toggleStatus(item)} className="mt-0.5"><Icon className={`w-4 h-4 ${sc}`} /></button>
                                 <div className="min-w-0 flex-1">
                                   <p className="text-xs font-bold text-white truncate">{item.title}</p>
                                   <p className="text-[10px] text-slate-500">{item.module} · {item.department}</p>
                                   <div className="flex items-center gap-1 mt-1">
-                                    <span className={`text-[9px] font-bold px-1 py-0.25 rounded border ${
-                                      item.priority === 'critical' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
-                                      item.priority === 'high' ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' :
-                                      item.priority === 'medium' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
-                                      'bg-slate-500/20 text-slate-300 border-slate-500/30'
-                                    }`}>{item.priority}</span>
-                                    <span className={`text-[9px] font-bold px-1 py-0.25 rounded border border-[#3d3d5c] ${
-                                      item.status === 'completed' ? 'text-emerald-400' :
-                                      item.status === 'in-progress' ? 'text-amber-400' : 'text-slate-500'
-                                    }`}>{item.status}</span>
+                                    <span className={`text-[9px] font-bold px-1 py-0.25 rounded border ${item.priority === 'critical' ? 'bg-red-500/20 text-red-300 border-red-500/30' : item.priority === 'high' ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' : item.priority === 'medium' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-slate-500/20 text-slate-300 border-slate-500/30'}`}>{item.priority}</span>
+                                    <span className={`text-[9px] font-bold px-1 py-0.25 rounded border border-[#3d3d5c] ${item.status === 'completed' ? 'text-emerald-400' : item.status === 'in-progress' ? 'text-amber-400' : 'text-slate-500'}`}>{item.status}</span>
                                   </div>
                                 </div>
-                                <button onClick={() => handleDelete(item.id)} className="p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                                <button onClick={() => handleDelete(item.id)} className="p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
                               </div>
                             </div>
                           );
@@ -148,9 +233,7 @@ export default function Roadmap() {
         ))
       )}
 
-      {showForm && (
-        <RoadmapForm onSave={handleSave} onCancel={() => setShowForm(false)} />
-      )}
+      {showForm && <RoadmapForm onSave={handleSave} onCancel={() => setShowForm(false)} />}
     </div>
   );
 }
@@ -197,23 +280,15 @@ function RoadmapForm({ onSave, onCancel }: { onSave: (d: any) => void; onCancel:
 }
 
 function Input({ label, value, onChange, ...props }: any) {
-  return (
-    <div>
-      <label className="text-xs font-bold text-slate-400 mb-1 block">{label}</label>
-      <input value={value} onChange={e => onChange(e.target.value)} {...props}
-        className="w-full px-3 py-2 rounded-xl bg-[#25253e] border-2 border-[#3d3d5c] text-sm text-white placeholder-slate-500 focus:border-amber-400/40 focus:outline-none" />
-    </div>
-  );
+  return (<div><label className="text-xs font-bold text-slate-400 mb-1 block">{label}</label>
+    <input value={value} onChange={e => onChange(e.target.value)} {...props}
+      className="w-full px-3 py-2 rounded-xl bg-[#25253e] border-2 border-[#3d3d5c] text-sm text-white placeholder-slate-500 focus:border-amber-400/40 focus:outline-none" /></div>);
 }
 
 function Select({ label, value, onChange, options }: any) {
-  return (
-    <div>
-      <label className="text-xs font-bold text-slate-400 mb-1 block">{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-xl bg-[#25253e] border-2 border-[#3d3d5c] text-sm text-white focus:border-amber-400/40 focus:outline-none">
-        {options.map((o: string) => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
-  );
+  return (<div><label className="text-xs font-bold text-slate-400 mb-1 block">{label}</label>
+    <select value={value} onChange={e => onChange(e.target.value)}
+      className="w-full px-3 py-2 rounded-xl bg-[#25253e] border-2 border-[#3d3d5c] text-sm text-white focus:border-amber-400/40 focus:outline-none">
+      {options.map((o: string) => <option key={o} value={o}>{o}</option>)}
+    </select></div>);
 }
